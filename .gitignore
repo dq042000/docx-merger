@@ -1,0 +1,8 @@
+# 報告內容屬客戶資料，不進版控
+*.docx
+*.pdf
+
+# Python
+.venv/
+__pycache__/
+*.pyc

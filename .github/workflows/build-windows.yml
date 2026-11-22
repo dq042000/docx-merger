@@ -1,0 +1,28 @@
+name: Build Windows exe
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install docxcompose pyinstaller
+
+      # docx 與 docxcompose 會讀套件內附的 XML 範本，要一起打包
+      - name: Build exe
+        run: pyinstaller --onefile --name docx-merger --collect-data docx --collect-data docxcompose merge_docx.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docx-merger-windows
+          path: dist/docx-merger.exe
