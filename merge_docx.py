@@ -15,7 +15,7 @@
 5. 在 Windows 上用本機的 Word 重算目錄頁次並存檔；沒有 Word 時改設定開檔時更新欄位
 
 用法：
-    uv run merge_docx.py 報告資料夾                  # 輸出到 報告資料夾/../合併.docx
+    uv run merge_docx.py 報告資料夾                  # 輸出到 報告資料夾/../合併_YYYYMMDD.docx
     uv run merge_docx.py 報告資料夾 -o out.docx
     uv run merge_docx.py 報告資料夾 --toc 02_目錄.docx  # 手動指定目錄檔
     uv run merge_docx.py 報告資料夾 --no-toc            # 不處理目錄
@@ -25,6 +25,7 @@
 import argparse
 import re
 import sys
+from datetime import date
 from copy import deepcopy
 from pathlib import Path
 
@@ -237,7 +238,7 @@ def update_fields_with_word(path):
 def main():
     parser = argparse.ArgumentParser(description="合併多份 docx 並修正頁碼與目錄頁次")
     parser.add_argument("folder", type=Path, nargs="?", help="放 docx 的資料夾，依檔名排序合併")
-    parser.add_argument("-o", "--output", type=Path, help="輸出檔（預設：資料夾旁的 合併.docx）")
+    parser.add_argument("-o", "--output", type=Path, help="輸出檔（預設：資料夾旁的 合併_當天日期.docx）")
     toc = parser.add_mutually_exclusive_group()
     toc.add_argument("--toc", help="目錄檔的檔名（預設：檔名含「目錄」的那份）")
     toc.add_argument("--no-toc", action="store_true", help="不改目錄頁次")
@@ -262,7 +263,7 @@ def main():
     elif not args.no_toc:
         toc_file = next((f for f in files if "目錄" in f.name), None)
 
-    output = args.output or args.folder.parent / "合併.docx"
+    output = args.output or args.folder.parent / f"合併_{date.today():%Y%m%d}.docx"
     composer = merge(files, toc_file, args.odd_from)
     composer.save(output)
 

@@ -26,7 +26,7 @@
 ## 使用
 
 ```bash
-uv run merge_docx.py ~/Downloads/報告                    # 輸出到 ~/Downloads/合併.docx
+uv run merge_docx.py ~/Downloads/報告                    # 輸出到 ~/Downloads/合併_20261122.docx（當天日期）
 uv run merge_docx.py ~/Downloads/報告 -o 報告-完整版.docx
 uv run merge_docx.py ~/Downloads/報告 --toc 02_目錄.docx  # 手動指定目錄檔
 uv run merge_docx.py ~/Downloads/報告 --no-toc            # 不改目錄頁次
@@ -42,7 +42,7 @@ uv run merge_docx.py ~/Downloads/報告 --odd-from 5        # 改成第 5 份起
 - 把報告資料夾拖到 `docx-merger.exe` 圖示上
 - 雙擊 `docx-merger.exe`，再把報告資料夾拖進跳出來的視窗，按 Enter
 
-合併檔會輸出在報告資料夾旁邊，檔名 `合併.docx`。
+合併檔會輸出在報告資料夾旁邊，檔名是 `合併_` 加上執行當天日期，例如 `合併_20261122.docx`。
 
 畫面顯示「目錄頁次已由 Word 重算並存檔」就完成了。若顯示「無法自動重算目錄頁次」，
 請用 Word 開啟合併檔，按 `Ctrl+A` 全選，再按 `F9` 更新欄位。
