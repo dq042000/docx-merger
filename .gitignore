@@ -2,6 +2,9 @@
 *.docx
 *.pdf
 
+# 打包產物，由 GitHub Actions 產生
+dist/
+
 # Python
 .venv/
 __pycache__/

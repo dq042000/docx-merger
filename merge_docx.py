@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["docxcompose"]
+# dependencies = ["docxcompose", "pywin32; sys_platform == 'win32'"]
 # ///
 """把資料夾裡的多份 docx 依檔名排序合併成一份，並讓頁碼與目錄頁次自動正確。
 
@@ -12,7 +12,7 @@
 2. 保留每份檔案的分節，每份都從新的一頁開始
 3. 拿掉所有寫死的起始頁碼，只留第一份的，頁碼改為一路連續
 4. 目錄檔（檔名含「目錄」）裡手打的頁次數字，改成指向各份開頭書籤的 PAGEREF 欄位
-5. 設定開檔時更新欄位，Word 開啟時會重算目錄頁次
+5. 在 Windows 上用本機的 Word 重算目錄頁次並存檔；沒有 Word 時改設定開檔時更新欄位
 
 用法：
     uv run merge_docx.py 報告資料夾                  # 輸出到 報告資料夾/../合併.docx
@@ -192,8 +192,35 @@ def merge(files, toc_file):
         body.replace(current, new)
         composer.append(doc)
 
-    set_update_fields_on_open(master)
     return composer
+
+
+def update_fields_with_word(path):
+    """用本機的 Word 重算所有欄位（目錄頁次）並存檔；不是 Windows、沒裝 Word 或失敗時回傳 False。"""
+    if sys.platform != "win32":
+        return False
+    try:
+        import win32com.client
+    except ImportError:
+        return False
+    word = None
+    try:
+        # DispatchEx 開一個獨立的 Word，不會動到使用者已開啟的文件
+        word = win32com.client.DispatchEx("Word.Application")
+        word.Visible = False
+        word.DisplayAlerts = 0  # wdAlertsNone
+        doc = word.Documents.Open(str(path.resolve()), AddToRecentFiles=False)
+        doc.Repaginate()
+        doc.Fields.Update()
+        doc.Save()
+        doc.Close()
+        return True
+    except Exception as e:
+        print(f"用 Word 重算目錄頁次失敗：{e}", file=sys.stderr)
+        return False
+    finally:
+        if word is not None:
+            word.Quit()
 
 
 def main():
@@ -228,7 +255,15 @@ def main():
 
     print(f"已合併 {len(files)} 份檔案 → {output}")
     print(f"目錄：{toc_file.name if toc_file else '未處理'}")
-    print("用 Word 開啟時若詢問「是否更新欄位」，請按「是」，目錄頁次才會重算。")
+    if toc_file is None:
+        return
+    print("正在用 Word 重算目錄頁次⋯⋯")
+    if update_fields_with_word(output):
+        print("目錄頁次已由 Word 重算並存檔。")
+    else:
+        set_update_fields_on_open(composer.doc)
+        composer.save(output)
+        print("無法自動重算目錄頁次。請用 Word 開啟後按 Ctrl+A 全選，再按 F9 更新欄位。")
 
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install docxcompose pyinstaller
+        run: pip install docxcompose pywin32 pyinstaller
 
       # docx 與 docxcompose 會讀套件內附的 XML 範本，要一起打包
       - name: Build exe
