@@ -9,7 +9,8 @@
 
 這支腳本合併時會：
 
-1. 保留每份檔案的分節、頁面設定，每份都從新的一頁開始
+1. 保留每份檔案的分節、頁面設定，每份都從新的一頁開始；
+   第 4 份起每份第 1 頁都排在奇數頁，前一份結束在奇數頁時自動補一張空白頁（方便雙面列印）
 2. 拿掉各份寫死的起始頁碼（只保留第一份的），頁碼改為一路連續
 3. 把目錄檔裡手打的頁次數字，換成指向各份檔案開頭的 `PAGEREF` 欄位
 4. 在 Windows 上，自動在背景開啟本機的 Word 重算目錄頁次並存檔；
@@ -29,6 +30,8 @@ uv run merge_docx.py ~/Downloads/報告                    # 輸出到 ~/Downloa
 uv run merge_docx.py ~/Downloads/報告 -o 報告-完整版.docx
 uv run merge_docx.py ~/Downloads/報告 --toc 02_目錄.docx  # 手動指定目錄檔
 uv run merge_docx.py ~/Downloads/報告 --no-toc            # 不改目錄頁次
+uv run merge_docx.py ~/Downloads/報告 --odd-from 0        # 不強制從奇數頁開始
+uv run merge_docx.py ~/Downloads/報告 --odd-from 5        # 改成第 5 份起才從奇數頁開始
 ```
 
 ### Windows 執行檔
