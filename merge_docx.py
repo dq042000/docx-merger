@@ -9,25 +9,28 @@
 直接合併後只要任何一份增減頁數，後面的頁碼就全錯。這支腳本：
 
 1. 用 docxcompose 合併內容（樣式、編號、圖片）
-2. 保留每份檔案的分節，每份都從新的一頁開始
+2. 保留每份檔案的分節，每份都從新的一頁開始；第 4 份起每份從奇數頁開始（方便雙面列印）
 3. 拿掉所有寫死的起始頁碼，只留第一份的，頁碼改為一路連續
 4. 目錄檔（檔名含「目錄」）裡手打的頁次數字，改成指向各份開頭書籤的 PAGEREF 欄位
 5. 在 Windows 上用本機的 Word 重算目錄頁次並存檔；沒有 Word 時改設定開檔時更新欄位
 
 用法：
-    uv run merge_docx.py 報告資料夾                  # 輸出到 報告資料夾/../合併.docx
+    uv run merge_docx.py 報告資料夾                  # 輸出到 報告資料夾/../合併_YYYYMMDD.docx
     uv run merge_docx.py 報告資料夾 -o out.docx
     uv run merge_docx.py 報告資料夾 --toc 02_目錄.docx  # 手動指定目錄檔
     uv run merge_docx.py 報告資料夾 --no-toc            # 不處理目錄
+    uv run merge_docx.py 報告資料夾 --odd-from 0        # 不強制從奇數頁開始
 """
 
 import argparse
 import re
 import sys
+from datetime import date
 from copy import deepcopy
 from pathlib import Path
 
 from docx import Document
+from docx.enum.section import WD_SECTION_START
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docxcompose.composer import Composer
@@ -35,12 +38,18 @@ from docxcompose.composer import Composer
 BOOKMARK_PREFIX = "_merge_doc_"  # 底線開頭是 Word 的隱藏書籤，不會出現在書籤清單
 
 
-class NumberingSafeComposer(Composer):
-    """docxcompose 2.2.0 的 add_numberings 對同一個元素只配一次新 numId，
-    元素裡若有兩組編號（例如目錄表格同時有「壹、」與「（一）」），兩組會撞成同一個 ID。
-    這裡改成一次只交給它一組編號，每組各自拿到新 ID，最後再統一改寫引用。"""
+class MergeComposer(Composer):
+    """修正 docxcompose 2.2.0 兩個不適用本工具的行為。"""
+
+    def fix_section_types(self, doc):
+        # 分節由 merge() 自行處理；docxcompose 會把新檔案第一節的分節類型
+        # 改成最後一節的，蓋掉「從奇數頁開始」的設定
+        pass
 
     def add_numberings(self, doc, element):
+        # add_numberings 對同一個元素只配一次新 numId，元素裡若有兩組編號
+        # （例如目錄表格同時有「壹、」與「（一）」），兩組會撞成同一個 ID。
+        # 這裡改成一次只交給它一組編號，每組各自拿到新 ID，最後再統一改寫引用。
         refs = element.findall(".//" + qn("w:numId"))
         for num_id in dict.fromkeys(ref.get(qn("w:val")) for ref in refs):
             single = OxmlElement("w:p")
@@ -160,20 +169,23 @@ def set_update_fields_on_open(doc):
     el.set(qn("w:val"), "true")
 
 
-def merge(files, toc_file):
+def merge(files, toc_file, odd_from):
     bookmarks = [f"{BOOKMARK_PREFIX}{i:02d}" for i in range(len(files))]
     docs = []
     for i, f in enumerate(files):
         doc = Document(f)
         strip_page_starts(doc, keep_first=(i == 0))
         add_bookmark(doc, bookmarks[i])
+        if odd_from and i + 1 >= odd_from:
+            # 奇數頁分節：前一份結束在奇數頁時，Word 會自動補一張空白頁
+            doc.sections[0].start_type = WD_SECTION_START.ODD_PAGE
         docs.append(doc)
 
     if toc_file is not None:
         link_toc(docs[files.index(toc_file)], bookmarks)
 
     master = docs[0]
-    composer = NumberingSafeComposer(master)
+    composer = MergeComposer(master)
     # 頁尾由第一份提供，後面各節自動沿用；不讓 docxcompose 搬動頁尾與頁碼設定
     composer.first_section_properties_added = True
     body = master.element.body
@@ -226,10 +238,12 @@ def update_fields_with_word(path):
 def main():
     parser = argparse.ArgumentParser(description="合併多份 docx 並修正頁碼與目錄頁次")
     parser.add_argument("folder", type=Path, nargs="?", help="放 docx 的資料夾，依檔名排序合併")
-    parser.add_argument("-o", "--output", type=Path, help="輸出檔（預設：資料夾旁的 合併.docx）")
+    parser.add_argument("-o", "--output", type=Path, help="輸出檔（預設：資料夾旁的 合併_當天日期.docx）")
     toc = parser.add_mutually_exclusive_group()
     toc.add_argument("--toc", help="目錄檔的檔名（預設：檔名含「目錄」的那份）")
     toc.add_argument("--no-toc", action="store_true", help="不改目錄頁次")
+    parser.add_argument("--odd-from", type=int, default=4, metavar="N",
+                        help="從第 N 份起，每份第 1 頁都排在奇數頁（預設 4；0 表示不處理）")
     args = parser.parse_args()
     if args.folder is None:
         # 雙擊執行檔時沒有參數；拖進主控台視窗的路徑可能帶引號
@@ -249,8 +263,8 @@ def main():
     elif not args.no_toc:
         toc_file = next((f for f in files if "目錄" in f.name), None)
 
-    output = args.output or args.folder.parent / "合併.docx"
-    composer = merge(files, toc_file)
+    output = args.output or args.folder.parent / f"合併_{date.today():%Y%m%d}.docx"
+    composer = merge(files, toc_file, args.odd_from)
     composer.save(output)
 
     print(f"已合併 {len(files)} 份檔案 → {output}")
